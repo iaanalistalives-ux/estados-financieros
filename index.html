@@ -705,6 +705,8 @@ table{width:100%;border-collapse:collapse;font-size:12.5px;}
 th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--stone);border-bottom:1px solid var(--warm);padding:8px 6px;}
 td{padding:7px 6px;border-bottom:1px solid var(--warm-light);}
 th.n,td.n{text-align:right;white-space:nowrap;}
+.tscroll{overflow-x:auto;margin-top:14px;}
+td.vp{color:var(--sage);font-weight:700;} td.vn{color:var(--rose);font-weight:700;}
 tr:hover td{background:var(--warm-light);}
 tr.sub td{font-weight:700;border-top:1px solid var(--warm);}
 tr.tot td{font-weight:700;border-top:2px solid var(--sage);color:var(--petrol);}
@@ -786,6 +788,8 @@ td .cod{color:var(--stone);font-size:11px;margin-right:6px;}
   .kpi.hero .l,.kpi.hero .s{color:var(--stone)!important;}
   .cwrap,.cwrap.tall{height:170px!important;}
 }
+/* El botón 🌙/☀️ lo pone el portal de Sistemas; aquí solo se sigue su modo (o el del equipo fuera del portal). */
+button.lsTemaBtn,.lsTemaPie{display:none!important}
 </style>
 </head>
 <body>
@@ -796,6 +800,12 @@ td .cod{color:var(--stone);font-size:11px;margin-right:6px;}
       <button type="button" data-a="MES" class="active">Mes</button>
       <button type="button" data-a="ACUM">Acumulado del año</button>
     </div>
+    <select id="selMed" aria-label="Comparar entre años" hidden>
+      <option value="ventas">Comparar: Ventas netas</option>
+      <option value="utilidad_bruta">Comparar: Utilidad bruta</option>
+      <option value="utilidad_operacion">Comparar: Utilidad de operación</option>
+      <option value="utilidad_ejercicio">Comparar: Utilidad del ejercicio</option>
+    </select>
     <button type="button" class="estado" id="estadoMes" hidden></button>
     <span class="spacer"></span>
     <button type="button" class="btn" id="btnImprimir">Imprimir</button>
@@ -847,9 +857,10 @@ td .cod{color:var(--stone);font-size:11px;margin-right:6px;}
       </div>
       <div class="grid" id="gridAnual" hidden>
         <div class="panel col12"><span class="tira dinero"></span>
-          <div class="pt">Ventas por mes, comparativo entre años</div>
-          <div class="ph">En soles, una línea por año.</div>
+          <div class="pt" id="tAnual">Ventas por mes, comparativo entre años</div>
+          <div class="ph" id="phAnual">En soles, una línea por año.</div>
           <div class="cwrap tall"><canvas id="chAnual"></canvas></div>
+          <div class="tscroll"><table id="tblAnual"></table></div>
         </div>
       </div>
     </div>
@@ -963,7 +974,8 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return
 function $(id){return document.getElementById(id);}
 
 /* ===================== Estado ===================== */
-var D=null, SEL={per:null,alc:'MES'}, charts=[];
+var D=null, SEL={per:null,alc:'MES',med:'ventas'}, charts=[];
+var MEDIDAS={ventas:'Ventas netas',utilidad_bruta:'Utilidad bruta',utilidad_operacion:'Utilidad de operación',utilidad_ejercicio:'Utilidad del ejercicio'};
 function erDe(p,alc){return D.er.filter(function(x){return x.periodo===p&&x.alcance===(alc||SEL.alc);})[0]||null;}
 function bgDe(p){return D.bg.filter(function(x){return x.periodo===p;})[0]||null;}
 function perAnt(p){var i=D.pers.indexOf(p);return i>0?D.pers[i-1]:null;}
@@ -1125,13 +1137,35 @@ function renderResultados(){
     $('chVentas').closest('.panel').style.display='';$('chFin').closest('.panel').style.display='';
   } else {$('chVentas').closest('.panel').style.display='none';$('chFin').closest('.panel').style.display='none';}
   $('phFin').textContent='En soles, '+(acum?'acumulado de enero a cada mes':'de cada mes')+'. Cuentas 77 (ingresos financieros) y 97 (gastos financieros, en positivo).';
-  /* Comparativo entre años (solo si hay más de un año cargado) */
-  var g=$('gridAnual');
+  /* Comparativo entre años (solo si hay más de un año cargado): sigue el interruptor Mes / Acumulado del año */
+  var g=$('gridAnual');$('selMed').hidden=D.anios.length<2;$('selMed').value=SEL.med;
   if(D.anios.length>1){g.hidden=false;
-    var ds=D.anios.slice().reverse().map(function(a,i){var col=ANIOS[Math.min(i,ANIOS.length-1)];
-      return {label:String(a),data:MES3.map(function(m,k){var q=a+'-'+String(k+1).padStart(2,'0')+'-01';var r=erDe(q,'MES');return r?r.ventas:null;}),
-        borderColor:col,backgroundColor:col,borderWidth:i===0?3.5:2.5,tension:.35,pointRadius:4,pointBackgroundColor:col,pointBorderColor:'#fff',pointBorderWidth:2,spanGaps:false};});
-    mk('chAnual',{type:'line',data:{labels:MES3,datasets:ds},options:lineaOpts(function(v){return M(v);},function(v){return M(v);}),plugins:[etiquetasTendencia]});
+    var an=D.anios.slice().sort(function(a,b){return a-b;}),aN=an[an.length-1],aP=an[an.length-2],med=SEL.med,nMed=MEDIDAS[med];
+    var V={};an.forEach(function(a){V[a]=MES3.map(function(m,k){var r=erDe(a+'-'+String(k+1).padStart(2,'0')+'-01');return r?r[med]:null;});});
+    var vari=function(act,ant){return (act==null||ant==null||ant<=0)?null:100*(act-ant)/ant;};
+    var vtxt=function(v){return v==null?'—':(v>0.05?'▲ ':v<-0.05?'▼ ':'')+P(Math.abs(v));};
+    var vcls=function(v){return v==null||Math.abs(v)<0.05?'':(v>0?' vp':' vn');};
+    $('tAnual').textContent=nMed+(acum?' acumulada de enero a cada mes':' por mes')+', comparativo entre años';
+    $('phAnual').textContent='En soles, una línea por año'+(acum?', acumulando desde enero.':'.')+' La variación compara '+aN+' contra '+aP+' en el mismo mes'+(med==='ventas'?'':' (sin % si '+aP+' fue pérdida o cero; ahí mira la diferencia)')+(MOVIL?'. Toca una línea para ver el valor.':'.');
+    var conEtiq=!MOVIL&&($('chAnual').parentNode.clientWidth||0)>=640;
+    var ds=an.slice().reverse().map(function(a,i){var col=ANIOS[Math.min(i,ANIOS.length-1)];
+      return {label:String(a),data:V[a],sinEtiquetas:!conEtiq||(i>0&&an.length>2),etiquetaAbajo:i%2===1,
+        borderColor:col,backgroundColor:col,borderWidth:i===0?3.5:2.5,tension:.35,pointRadius:i===0?5:4,pointHoverRadius:8,pointBackgroundColor:col,pointBorderColor:'#fff',pointBorderWidth:2,spanGaps:false};});
+    var op=lineaOpts(function(v){return M(v);},function(v){return M(v);});
+    op.interaction={mode:'index',intersect:false};
+    op.plugins.tooltip.callbacks.footer=function(it){var v=vari(V[aN][it[0].dataIndex],V[aP][it[0].dataIndex]);var a=V[aN][it[0].dataIndex],b=V[aP][it[0].dataIndex];return (a==null||b==null)?'':'Diferencia '+aN+' vs '+aP+': '+SM(a-b)+(v==null?'':' ('+vtxt(v)+')');};
+    mk('chAnual',{type:'line',data:{labels:MES3,datasets:ds},options:op,plugins:[etiquetasTendencia]});
+    /* Tabla: un mes por fila, un año por columna, y la variación del año más reciente contra el anterior */
+    var ult=-1;V[aN].forEach(function(v,k){if(v!=null)ult=k;});
+    var h='<thead><tr><th>Mes</th>'+an.map(function(a){return '<th class="n">'+a+'</th>';}).join('')+'<th class="n">Dif. '+aN+' vs '+aP+'</th><th class="n">Var. %</th></tr></thead><tbody>';
+    var dif=function(a,b){return (a==null||b==null)?null:a-b;};
+    MES3.forEach(function(m,k){if(an.every(function(a){return V[a][k]==null;}))return;
+      var v=vari(V[aN][k],V[aP][k]),df=dif(V[aN][k],V[aP][k]);
+      h+='<tr><td>'+m+'</td>'+an.map(function(a){var x=V[a][k];return '<td class="n'+(x<0?' neg':'')+'">'+ent(x)+'</td>';}).join('')+'<td class="n'+(df<0?' neg':'')+'">'+ent(df)+'</td><td class="n'+vcls(v)+'">'+vtxt(v)+'</td></tr>';});
+    if(!acum&&ult>=0){var T=function(a){var t=0,n=0;for(var k=0;k<=ult;k++)if(V[a][k]!=null){t+=V[a][k];n++;}return n===ult+1?t:null;};
+      var tv=vari(T(aN),T(aP));
+      h+='<tr class="tot"><td>'+(ult===0?'Ene':'Ene–'+MES3[ult])+'</td>'+an.map(function(a){return '<td class="n">'+ent(T(a))+'</td>';}).join('')+'<td class="n'+(dif(T(aN),T(aP))<0?' neg':'')+'">'+ent(dif(T(aN),T(aP)))+'</td><td class="n'+vcls(tv)+'">'+vtxt(tv)+'</td></tr>';}
+    $('tblAnual').innerHTML=h+'</tbody>';
   } else g.hidden=true;
 }
 
@@ -1310,6 +1344,7 @@ function abrirTab(i){
 document.querySelectorAll('#tabs button').forEach(function(b){b.addEventListener('click',function(){abrirTab(+b.getAttribute('data-t'));});});
 document.querySelectorAll('#segAlc button').forEach(function(b){b.addEventListener('click',function(){SEL.alc=b.getAttribute('data-a');render();});});
 $('selPer').addEventListener('change',function(){SEL.per=this.value;render();});
+$('selMed').addEventListener('change',function(){SEL.med=this.value;render();});
 $('btnImprimir').addEventListener('click',function(){window.print();});
 window.addEventListener('beforeprint',function(){charts.forEach(function(c){try{c.resize();}catch(e){}});});
 
@@ -1339,17 +1374,28 @@ window.LS_XLS={
     var det=D.cuentas.slice().sort(function(a,c){return a.periodo<c.periodo?-1:a.periodo>c.periodo?1:(a.estado_fin===c.estado_fin?a.orden-c.orden:(a.estado_fin==='BG'?-1:1));}).map(function(x){
       return {per:nomPer(x.periodo),ef:x.estado_fin==='BG'?'Balance general':'Estado de resultados',sec:x.seccion.replace(/_/g,' ').toLowerCase(),cta:x.cuenta,des:x.descripcion,
         mes:x.estado_fin==='ER'?x.importe_mes:null,acu:x.importe_acum};});
+    var anSec=[];
+    if(D.anios.length>1){
+      var an=D.anios.slice().sort(function(a,b){return a-b;}),aN=an[an.length-1],aP=an[an.length-2];
+      var vv=function(a,k){var r=erDe(a+'-'+String(k+1).padStart(2,'0')+'-01');return r?r[SEL.med]:null;};
+      var anF=MES3.map(function(m,k){var o={k:m};an.forEach(function(a){o['a'+a]=vv(a,k);});
+        o.d=(o['a'+aN]!=null&&o['a'+aP]!=null)?o['a'+aN]-o['a'+aP]:null;
+        o.v=(o['a'+aN]!=null&&o['a'+aP]!=null&&o['a'+aP]>0)?(o['a'+aN]-o['a'+aP])/o['a'+aP]:null;return o;})
+        .filter(function(o){return an.some(function(a){return o['a'+a]!=null;});});
+      anSec=[{titulo:MEDIDAS[SEL.med]+(acum?' acumulada de enero a cada mes':' por mes')+', comparativo entre años',nota:'En soles. La diferencia y la variación comparan '+aN+' contra '+aP+' en el mismo mes; sin % si '+aP+' fue pérdida o cero.',
+        columnas:[col('k','Mes','texto')].concat(an.map(function(a){return col('a'+a,String(a),'moneda');})).concat([col('d','Dif. '+aN+' vs '+aP,'moneda'),col('v','Var. %','porcentaje')]),filas:anF}];}
     return {titulo:'Estados Financieros',sub:nomPer(p)+' · '+(acum?'acumulado del año':'mes'),
       formula:'Hoja Resumen: lo que se ve en pantalla. Hoja Detalle: cada cuenta tal como la entrega el sistema, todos los meses cargados.',origen:'Estados Financieros',
       resumen:[
         {titulo:'Estado de resultados ('+(acum?'acumulado de enero a cada mes':'cada mes')+')',nota:'En soles. % sobre las ventas '+(acum?'acumuladas a ':'de ')+nomPer(p).toLowerCase()+'. Antes de impuestos.',
          columnas:[col('k','Concepto','texto')].concat(perCols).concat([col('p','% ventas','porcentaje')]),filas:erFilas},
-        {titulo:'Balance general (saldo al cierre)',nota:'En soles. La depreciación acumulada (39) resta al activo fijo.',columnas:[col('k','Concepto','texto')].concat(perCols),filas:bgFilas},
+        {titulo:'Balance general (saldo al cierre)',nota:'En soles. La depreciación acumulada (39) resta al activo fijo.',columnas:[col('k','Concepto','texto')].concat(perCols),filas:bgFilas}
+      ].concat(anSec).concat([
         {titulo:'Liquidez, endeudamiento y ciclo de caja',nota:'Días aproximados con el promedio mensual de ventas y costo de ventas de enero a cada mes.',
          columnas:[col('k','Indicador','texto')].concat(ps.map(function(q,i){return col('m'+i,corto(q),'decimal');})),filas:indFilas},
         {titulo:'Control del cierre · '+nomPer(p),nota:'Tolerancia de cuadre: S/ '+num(D.tol,0)+'.',
          columnas:[col('k','Control','texto'),col('e','Estado','texto'),col('v','Valor (S/)','moneda'),col('t','Valor','texto'),col('d','Detalle','texto')],filas:ctlF}
-      ],
+      ]),
       detalle:{congelarCols:2,nota:'Una fila por cuenta y mes. Balance: saldo al cierre. Estado de resultados: importe del mes y acumulado del año.',filas:det,
         columnas:[col('per','Mes','texto'),col('ef','Estado','texto'),col('sec','Sección','texto'),col('cta','Cuenta','alfanumerico'),col('des','Descripción','texto'),col('mes','Importe del mes','moneda'),col('acu','Saldo / acumulado','moneda')]}};
   }

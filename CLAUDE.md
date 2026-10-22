@@ -4,9 +4,9 @@ Las reglas generales están en el CLAUDE.md del repo `lives-instrucciones`. Aqu�
 
 ## Qué hace
 Dashboard de gerencia con el Balance General y el Estado de Resultados por función, mes a mes (en soles). Una sola pantalla: `index.html`.
-- Barra: mes, Mes / Acumulado del año, aviso "Balance no cuadra · S/ X" (lleva a Control del cierre), Descargar Excel, Imprimir, 🌙.
+- Barra: mes, Mes / Acumulado del año, aviso "Balance no cuadra · S/ X" (lleva a Control del cierre), Descargar Excel, Imprimir. Sin botón 🌙 propio (desde 22/10/2026): el modo oscuro existe y sigue al portal de Sistemas (o al equipo, fuera del portal); el botón lo pone el portal.
 - KPIs: ventas netas, margen bruto, utilidad de operación, utilidad del ejercicio, efectivo al cierre.
-- Pestaña Resultados: cascada de ventas a utilidad, márgenes por mes, estado de resultados, ventas y costo, ingresos y gastos financieros. Si hay más de un año cargado aparece el comparativo de ventas en líneas por año.
+- Pestaña Resultados: cascada de ventas a utilidad, márgenes por mes, estado de resultados, ventas y costo, ingresos y gastos financieros. Si hay más de un año cargado aparece el comparativo de ventas en líneas por año (ene–dic, una línea por año), con tabla mes a mes, diferencia en soles y variación % del año más reciente contra el anterior (sin % si el año anterior fue pérdida o cero). Un selector en la barra ("Comparar:" ventas netas, utilidad bruta, de operación o del ejercicio) aparece solo con más de un año. Sigue el interruptor Mes / Acumulado del año y va también en el Excel. Con más de 2 años solo el año más reciente lleva etiquetas; en celular se ven al tocar.
 - Pestaña Balance y caja: liquidez, prueba ácida, pasivo ÷ patrimonio, días de cobro, inventario y pago, ciclo de caja, composición del activo y del financiamiento, balance general, efectivo/clientes/inventarios.
 - Pestaña Control del cierre (para Contabilidad): cuadre, cuenta 99 = utilidad, totales impresos = suma de cuentas, líneas del estado de resultados, depreciación en el pasivo, cuenta 45, cuentas sin movimiento, margen del mes. Cada control se pone en verde cuando el dato llega corregido del sistema.
 
