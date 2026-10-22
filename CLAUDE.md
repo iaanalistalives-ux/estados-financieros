@@ -15,11 +15,11 @@ Criterios: la depreciación acumulada (39) resta al activo fijo (el reporte del 
 ## Datos (Supabase, prefijo `ef_`)
 - `ef_periodos` (mes, fecha de corte, provisional/cerrado), `ef_saldos` (cuenta por mes: BG saldo; ER mes y acumulado; `vigente=false` guarda lo que se mostró antes de una corrección), `ef_totales` (totales tal como los imprime el reporte), `ef_acceso` (quién puede ver), `ef_config` (`tolerancia_cuadre` = 1 sol).
 - Vistas: `ef_v_er`, `ef_v_bg`, `ef_v_control`. Puerta única: `ef_api(p_accion, p)` con acciones `permiso`, `periodos`, `resumen`, `control`.
-- **Excepción a la lectura libre** (decisión de Christian, 22/10/2026): las tablas y vistas `ef_` no se leen con la clave pública; solo la puerta entrega datos y solo a usuarios de `ef_acceso` (hoy ctalepcio y rcamogliano). Sin permiso, la pantalla muestra "No tienes permiso…".
-- Datos de prueba: jul–set 2026 cargados desde los Excel de Contabilidad (`AD\nuevos\Contabilidad`). Registro SQL en `AD\entregables\estados-financieros` (Ef01 esquema, Ef02 carga).
+- **Lectura libre** (decisión de Christian, 22/10/2026): prueba con 3 meses (jul-set 2026), se ve fuera del portal y sin usuario; solo Christian y Sistemas tienen el link. Las tablas y vistas `ef_` siguen cerradas: la única puerta es `ef_api` y nadie puede escribir. `ef_acceso` queda sin usar; para volver a cerrar, restaurar `ef_puede_ver_` con la versión de Ef01. En SQL Server se exige usuario.
+- Datos de prueba: jul–set 2026 cargados desde los Excel de Contabilidad (`AD\nuevos\Contabilidad`). Registro SQL en `AD\entregables\estados-financieros` (Ef01 esquema, Ef02 carga, Ef03 lectura libre).
 
 ## Quién la usa
-Gerencia General (Rodrigo, supervisión) y Christian. Contabilidad la usará para corregir en el sistema lo que marca Control del cierre (agregarlos a `ef_acceso`).
+Gerencia General (Rodrigo, supervisión) y Christian. Contabilidad la usará para corregir en el sistema lo que marca Control del cierre.
 
 ## Paso a SQL Server
 Paquete para Sistemas en `AD\entregables\estados-financieros`. En el HTML solo cambia la constante `PUERTA`. Los saldos por cuenta y mes salen directo del sistema contable (nadie sube archivos).
