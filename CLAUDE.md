@@ -16,7 +16,7 @@ Criterios: la depreciación acumulada (39) resta al activo fijo (el reporte del 
 - `ef_periodos` (mes, fecha de corte, provisional/cerrado), `ef_saldos` (cuenta por mes: BG saldo; ER mes y acumulado; `vigente=false` guarda lo que se mostró antes de una corrección), `ef_totales` (totales tal como los imprime el reporte), `ef_acceso` (quién puede ver), `ef_config` (`tolerancia_cuadre` = 1 sol).
 - Vistas: `ef_v_er`, `ef_v_bg`, `ef_v_control`. Puerta única: `ef_api(p_accion, p)` con acciones `permiso`, `periodos`, `resumen`, `control`.
 - **Lectura libre** (decisión de Christian, 22/10/2026): prueba con 3 meses (jul-set 2026), se ve fuera del portal y sin usuario; solo Christian y Sistemas tienen el link. Las tablas y vistas `ef_` siguen cerradas: la única puerta es `ef_api` y nadie puede escribir. `ef_acceso` queda sin usar; para volver a cerrar, restaurar `ef_puede_ver_` con la versión de Ef01. En SQL Server se exige usuario.
-- Datos de prueba: jul–set 2026 cargados desde los Excel de Contabilidad (`AD\nuevos\Contabilidad`). Registro SQL en `AD\entregables\estados-financieros` (Ef01 esquema, Ef02 carga, Ef03 lectura libre).
+- Datos de prueba: jul–set 2026 cargados desde los Excel de Contabilidad (`AD\nuevos\Contabilidad`). Además, datos FICTICIOS de ene–dic 2025 (22/10/2026, solo para probar el comparativo entre años; no son de la empresa, no se migran; se quitan con el bloque "DESHACER" de Ef04: borrar lo anterior a 2026 en `ef_totales`, `ef_saldos` y `ef_periodos`). Registro SQL en `AD\entregables\estados-financieros` (Ef01 esquema, Ef02 carga, Ef03 lectura libre, Ef04 datos ficticios 2025).
 
 ## Quién la usa
 Gerencia General (Rodrigo, supervisión) y Christian. Contabilidad la usará para corregir en el sistema lo que marca Control del cierre.
