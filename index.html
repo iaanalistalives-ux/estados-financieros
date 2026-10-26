@@ -803,7 +803,8 @@ button.lsTemaBtn,.lsTemaPie{display:none!important}
       <button type="button" data-a="MES" class="active">Mes</button>
       <button type="button" data-a="ACUM">Acumulado del año</button>
     </div>
-    <div class="seg" id="segVer" aria-label="Estado de resultados en soles o en % de ventas">
+    <div class="seg" id="segVer" aria-label="Cascada y estado de resultados en soles o en % de ventas">
+      <span style="align-self:center;padding:0 8px;font-size:12px;opacity:.7">Resultados en:</span>
       <button type="button" data-v="S" class="active">Soles</button>
       <button type="button" data-v="P">% de ventas</button>
     </div>
@@ -835,7 +836,7 @@ button.lsTemaBtn,.lsTemaPie{display:none!important}
       <div class="grid">
         <div class="panel col8"><span class="tira dinero"></span>
           <div class="pt" id="tCascada">De las ventas a la utilidad</div>
-          <div class="ph">Cómo se va de las ventas a la utilidad del ejercicio, en soles. Las barras grises restan o suman; las café son subtotales.</div>
+          <div class="ph" id="phCascada">Cómo se va de las ventas a la utilidad del ejercicio, en soles. Las barras grises restan o suman; las café son subtotales.</div>
           <div class="cwrap tall"><canvas id="chCascada"></canvas></div>
         </div>
         <div class="panel col4"><span class="tira resultado"></span>
@@ -1101,16 +1102,20 @@ function renderResultados(){
   var pasos=[['Ventas netas',e.ventas,'t'],['Costo de ventas',e.costo_ventas,'m'],['Utilidad bruta',e.utilidad_bruta,'t'],
     ['Gastos de venta',e.gastos_venta,'m'],['Gastos de administración',e.gastos_admin,'m'],['Utilidad de operación',e.utilidad_operacion,'t'],
     ['Resultado financiero y otros',fin,'m'],['Partidas excepcionales',exc,'m'],['Utilidad del ejercicio',e.utilidad_ejercicio,'t']];
+  /* % de ventas: cada paso se divide entre las ventas del mismo período (suma ÷ suma); sin ventas queda en soles */
+  var enPctC=SEL.ver==='P'&&!!e.ventas;
+  var vc=function(x){return enPctC?pct(x,e.ventas):x;},fc=function(x){return enPctC?P(x):M(x);};
+  $('phCascada').textContent=enPctC?'Cómo se va de las ventas (100 %) a la utilidad del ejercicio, en % sobre las ventas '+(acum?'acumuladas de enero a ':'de ')+nomPer(p).toLowerCase()+'. Las barras grises restan o suman; las café son subtotales.':'Cómo se va de las ventas a la utilidad del ejercicio, en soles. Las barras grises restan o suman; las café son subtotales.';
   var run=0,bars=[],cols=[];
-  pasos.forEach(function(s){if(s[2]==='t'){bars.push([0,s[1]]);run=s[1];cols.push(C.taupe);}else{bars.push([run,run+s[1]]);run+=s[1];cols.push('#9BAEB6');}});
+  pasos.forEach(function(s){var v=vc(s[1]);if(s[2]==='t'){bars.push([0,v]);run=v;cols.push(C.taupe);}else{bars.push([run,run+v]);run+=v;cols.push('#9BAEB6');}});
   mk('chCascada',{type:'bar',data:{labels:pasos.map(function(s){return MOVIL?s[0].replace('Gastos de administración','Gastos admin.').replace('Resultado financiero y otros','Financiero y otros'):s[0];}),
       datasets:[{data:bars,backgroundColor:cols,borderRadius:4,maxBarThickness:56}]},
     /* En celular la cascada va horizontal: así cada etiqueta tiene su propia fila */
     options:{indexAxis:MOVIL?'y':'x',animation:ANIM,layout:{padding:MOVIL?{right:64}:{top:26}},plugins:{legend:{display:false},
-      tooltip:{callbacks:{label:function(c){return pasos[c.dataIndex][0]+': '+sol(pasos[c.dataIndex][1]);}}},
-      etiquetasBarra:{fmt:function(v,i){var x=pasos[i][1];return (pasos[i][2]==='m'&&x>0?'+':'')+M(x);}}},
-      scales:MOVIL?{x:{grace:'8%',ticks:{maxTicksLimit:4,callback:function(v){return M(v);}}},y:{grid:{display:false},ticks:{autoSkip:false}}}
-                  :{y:{grace:'8%',ticks:{callback:function(v){return M(v);}}},x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:30,minRotation:0}}}},
+      tooltip:{callbacks:{label:function(c){return pasos[c.dataIndex][0]+': '+(enPctC?P(vc(pasos[c.dataIndex][1])):sol(pasos[c.dataIndex][1]));}}},
+      etiquetasBarra:{fmt:function(v,i){var x=vc(pasos[i][1]);return (pasos[i][2]==='m'&&x>0?'+':'')+fc(x);}}},
+      scales:MOVIL?{x:{grace:'8%',ticks:{maxTicksLimit:4,callback:function(v){return enPctC?v+'%':M(v);}}},y:{grid:{display:false},ticks:{autoSkip:false}}}
+                  :{y:{grace:'8%',ticks:{callback:function(v){return enPctC?v+'%':M(v);}}},x:{grid:{display:false},ticks:{autoSkip:false,maxRotation:30,minRotation:0}}}},
     plugins:[etiquetasBarra]});
   /* Márgenes por mes */
   var ps=persAnio(p),lab=ps.map(corto);
