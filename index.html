@@ -813,6 +813,9 @@ button.lsTemaBtn,.lsTemaPie{display:none!important}
       <option value="utilidad_bruta">Comparar: Utilidad bruta</option>
       <option value="utilidad_operacion">Comparar: Utilidad de operación</option>
       <option value="utilidad_ejercicio">Comparar: Utilidad del ejercicio</option>
+      <option value="margen_bruto">Comparar: Margen bruto (%)</option>
+      <option value="margen_operacion">Comparar: Margen de operación (%)</option>
+      <option value="margen_ejercicio">Comparar: Margen del ejercicio (%)</option>
     </select>
     <button type="button" class="btn" id="btnCmp" hidden>Comparativo</button>
     <button type="button" class="estado" id="estadoMes" hidden></button>
@@ -986,7 +989,11 @@ function $(id){return document.getElementById(id);}
 
 /* ===================== Estado ===================== */
 var D=null, SEL={per:null,anio:null,alc:'MES',med:'ventas',cmp:false,ver:'S',tab:0}, charts=[];
-var MEDIDAS={ventas:'Ventas netas',utilidad_bruta:'Utilidad bruta',utilidad_operacion:'Utilidad de operación',utilidad_ejercicio:'Utilidad del ejercicio'};
+var MEDIDAS={ventas:'Ventas netas',utilidad_bruta:'Utilidad bruta',utilidad_operacion:'Utilidad de operación',utilidad_ejercicio:'Utilidad del ejercicio',margen_bruto:'Margen bruto',margen_operacion:'Margen de operación',margen_ejercicio:'Margen del ejercicio'};
+/* Medidas en % de ventas: se calculan de las mismas cifras del estado de resultados (utilidad / ventas del mismo período) */
+var MEDNUM={margen_bruto:'utilidad_bruta',margen_operacion:'utilidad_operacion',margen_ejercicio:'utilidad_ejercicio'};
+function esPctMed(m){return !!MEDNUM[m];}
+function medVal(r,m){if(!r)return null;return esPctMed(m)?pct(r[MEDNUM[m]],r.ventas):r[m];}
 function erDe(p,alc){return D.er.filter(function(x){return x.periodo===p&&x.alcance===(alc||SEL.alc);})[0]||null;}
 function bgDe(p){return D.bg.filter(function(x){return x.periodo===p;})[0]||null;}
 function perAnt(p){var i=D.pers.indexOf(p);return i>0?D.pers[i-1]:null;}
@@ -1147,6 +1154,14 @@ function renderResultados(){
     h+='<tr class="'+(f[3]||'')+'"><td>'+(f[1]?'<span class="cod">'+f[1]+'</span>':'')+esc(f[0])+'</td>'+
       cps.map(function(q){var r=erDe(q),v=r?r[f[2]]:null;return '<td class="n'+(q===p?' sel':'')+(v<0?' neg':'')+'">'+(enPct?P(r?pct(v,r.ventas):null):ent(v))+'</td>';}).join('')+
       (enPct?'':'<td class="n">'+P(pct(e[f[2]],e.ventas))+'</td>')+'</tr>';});
+  /* Márgenes (% de las ventas de cada columna): utilidad / ventas; los gastos se muestran en positivo */
+  if(!enPct){
+    var mgF=[['Margen bruto','utilidad_bruta',1],['Margen de operación','utilidad_operacion',1],['Margen del ejercicio','utilidad_ejercicio',1],
+      ['Gastos de venta sobre ventas','gastos_venta',-1],['Gastos de administración sobre ventas','gastos_admin',-1]];
+    h+='<tr class="sub"><td colspan="'+(cps.length+2)+'">Márgenes · % sobre las ventas de cada columna</td></tr>';
+    mgF.forEach(function(f){
+      h+='<tr><td>'+esc(f[0])+'</td>'+cps.map(function(q){var r=erDe(q),v=r?pct(f[2]*r[f[1]],r.ventas):null;return '<td class="n'+(q===p?' sel':'')+(v<0?' neg':'')+'">'+P(v)+'</td>';}).join('')+'<td class="n"></td></tr>';});
+  }
   $('tblER').innerHTML=h+'</tbody>';
   /* Ventas y costo */
   $('phVC').textContent='En soles, '+(acum?'acumulado de enero a cada mes.':'de cada mes.')+' El costo se muestra en positivo para compararlo con las ventas.';
@@ -1166,31 +1181,33 @@ function renderResultados(){
   var g=$('gridAnual');$('selMed').value=SEL.med;
   if(SEL.cmp&&D.anios.length>1){g.hidden=false;
     var an=D.anios.slice().sort(function(a,b){return a-b;}),aN=an[an.length-1],aP=an[an.length-2],med=SEL.med,nMed=MEDIDAS[med];
-    var V={};an.forEach(function(a){V[a]=MES3.map(function(m,k){var r=erDe(a+'-'+String(k+1).padStart(2,'0')+'-01');return r?r[med]:null;});});
-    var vari=function(act,ant){return (act==null||ant==null||ant<=0)?null:100*(act-ant)/ant;};
+    var enP=esPctMed(med),fv=enP?function(v){return v==null?'—':P(v);}:ent,fm=enP?function(v){return v+'%';}:function(v){return M(v);};
+    var V={};an.forEach(function(a){V[a]=MES3.map(function(m,k){return medVal(erDe(a+'-'+String(k+1).padStart(2,'0')+'-01'),med);});});
+    var vari=function(act,ant){return enP?null:((act==null||ant==null||ant<=0)?null:100*(act-ant)/ant);};
     var vtxt=function(v){return v==null?'—':(v>0.05?'▲ ':v<-0.05?'▼ ':'')+P(Math.abs(v));};
     var vcls=function(v){return v==null||Math.abs(v)<0.05?'':(v>0?' vp':' vn');};
     $('tAnual').textContent=nMed+(acum?' acumulada de enero a cada mes':' por mes')+', comparativo entre años';
-    $('phAnual').textContent='En soles, una línea por año'+(acum?', acumulando desde enero.':'.')+' La variación compara '+aN+' contra '+aP+' en el mismo mes; el total suma solo los meses que están en los dos años'+(med==='ventas'?'':' (sin % si '+aP+' fue pérdida o cero; ahí mira la diferencia)')+(MOVIL?'. Toca una línea para ver el valor.':'.');
+    $('phAnual').textContent=enP?'En % sobre las ventas '+(acum?'acumuladas desde enero':'de cada mes')+', una línea por año. La diferencia está en puntos porcentuales (pts) y compara '+aN+' contra '+aP+' en el mismo mes'+(acum?'.':'; el total de los meses comunes es ponderado: suma de utilidades ÷ suma de ventas.')+(MOVIL?' Toca una línea para ver el valor.':''):'En soles, una línea por año'+(acum?', acumulando desde enero.':'.')+' La variación compara '+aN+' contra '+aP+' en el mismo mes; el total suma solo los meses que están en los dos años'+(med==='ventas'?'':' (sin % si '+aP+' fue pérdida o cero; ahí mira la diferencia)')+(MOVIL?'. Toca una línea para ver el valor.':'.');
     var conEtiq=!MOVIL&&($('chAnual').parentNode.clientWidth||0)>=640;
     var ds=an.slice().reverse().map(function(a,i){var col=ANIOS[Math.min(i,ANIOS.length-1)];
       return {label:String(a),data:V[a],sinEtiquetas:!conEtiq||(i>0&&an.length>2),etiquetaAbajo:i%2===1,
         borderColor:col,backgroundColor:col,borderWidth:i===0?3.5:2.5,tension:.35,pointRadius:i===0?5:4,pointHoverRadius:8,pointBackgroundColor:col,pointBorderColor:'#fff',pointBorderWidth:2,spanGaps:false};});
-    var op=lineaOpts(function(v){return M(v);},function(v){return M(v);});
+    var op=lineaOpts(fm,enP?function(v){return v.toFixed(1)+'%';}:function(v){return M(v);});
     op.interaction={mode:'index',intersect:false};
-    op.plugins.tooltip.callbacks.footer=function(it){var v=vari(V[aN][it[0].dataIndex],V[aP][it[0].dataIndex]);var a=V[aN][it[0].dataIndex],b=V[aP][it[0].dataIndex];return (a==null||b==null)?'':'Diferencia '+aN+' vs '+aP+': '+SM(a-b)+(v==null?'':' ('+vtxt(v)+')');};
+    op.plugins.tooltip.callbacks.footer=function(it){var v=vari(V[aN][it[0].dataIndex],V[aP][it[0].dataIndex]);var a=V[aN][it[0].dataIndex],b=V[aP][it[0].dataIndex];return (a==null||b==null)?'':'Diferencia '+aN+' vs '+aP+': '+(enP?num(a-b,1)+' pts':SM(a-b)+(v==null?'':' ('+vtxt(v)+')'));};
     mk('chAnual',{type:'line',data:{labels:MES3,datasets:ds},options:op,plugins:[etiquetasTendencia]});
     /* Tabla: un mes por fila, un año por columna, y la variación del año más reciente contra el anterior */
     var ult=-1;V[aN].forEach(function(v,k){if(v!=null)ult=k;});
-    var h='<thead><tr><th>Mes</th>'+an.map(function(a){return '<th class="n">'+a+'</th>';}).join('')+'<th class="n">Dif. '+aN+' vs '+aP+'</th><th class="n">Var. %</th></tr></thead><tbody>';
+    var h='<thead><tr><th>Mes</th>'+an.map(function(a){return '<th class="n">'+a+'</th>';}).join('')+'<th class="n">Dif. '+aN+' vs '+aP+(enP?' (pts)':'')+'</th>'+(enP?'':'<th class="n">Var. %</th>')+'</tr></thead><tbody>';
+    var fd=enP?function(d){return d==null?'—':num(d,1);}:ent;
     var dif=function(a,b){return (a==null||b==null)?null:a-b;};
     MES3.forEach(function(m,k){if(an.every(function(a){return V[a][k]==null;}))return;
       var v=vari(V[aN][k],V[aP][k]),df=dif(V[aN][k],V[aP][k]);
-      h+='<tr><td>'+m+'</td>'+an.map(function(a){var x=V[a][k];return '<td class="n'+(x<0?' neg':'')+'">'+ent(x)+'</td>';}).join('')+'<td class="n'+(df<0?' neg':'')+'">'+ent(df)+'</td><td class="n'+vcls(v)+'">'+vtxt(v)+'</td></tr>';});
+      h+='<tr><td>'+m+'</td>'+an.map(function(a){var x=V[a][k];return '<td class="n'+(x<0?' neg':'')+'">'+fv(x)+'</td>';}).join('')+'<td class="n'+(df<0?' neg':'')+'">'+fd(df)+'</td>'+(enP?'':'<td class="n'+vcls(v)+'">'+vtxt(v)+'</td>')+'</tr>';});
     var comun=[];MES3.forEach(function(m,k){if(V[aN][k]!=null&&V[aP][k]!=null)comun.push(k);});
-    if(!acum&&comun.length>1){var T=function(a){var t=0;for(var i=0;i<comun.length;i++){if(V[a][comun[i]]==null)return null;t+=V[a][comun[i]];}return t;};
+    if(!acum&&comun.length>1){var T=function(a){var t=0,vt=0;for(var i=0;i<comun.length;i++){if(V[a][comun[i]]==null)return null;if(enP){var rr=erDe(a+'-'+String(comun[i]+1).padStart(2,'0')+'-01');t+=rr[MEDNUM[med]];vt+=rr.ventas;}else t+=V[a][comun[i]];}return enP?pct(t,vt):t;};
       var tv=vari(T(aN),T(aP));
-      h+='<tr class="tot"><td>'+MES3[comun[0]]+'–'+MES3[comun[comun.length-1]]+'</td>'+an.map(function(a){return '<td class="n">'+ent(T(a))+'</td>';}).join('')+'<td class="n'+(dif(T(aN),T(aP))<0?' neg':'')+'">'+ent(dif(T(aN),T(aP)))+'</td><td class="n'+vcls(tv)+'">'+vtxt(tv)+'</td></tr>';}
+      h+='<tr class="tot"><td>'+MES3[comun[0]]+'–'+MES3[comun[comun.length-1]]+'</td>'+an.map(function(a){return '<td class="n">'+fv(T(a))+'</td>';}).join('')+'<td class="n'+(dif(T(aN),T(aP))<0?' neg':'')+'">'+fd(dif(T(aN),T(aP)))+'</td>'+(enP?'':'<td class="n'+vcls(tv)+'">'+vtxt(tv)+'</td>')+'</tr>';}
     $('tblAnual').innerHTML=h+'</tbody>';
   } else g.hidden=true;
 }
@@ -1403,6 +1420,9 @@ window.LS_XLS={
       if(enPct){x=r?pct(x,r.ventas):null;if(x!=null)x=x/100;}o['m'+i]=x;});if(f[1]==='utilidad_ejercicio')o.__total=true;return o;});
     var erCols=enPct?[col('k','Concepto','texto')].concat(ps.map(function(q,i){return col('m'+i,corto(q),'porcentaje');}))
                     :[col('k','Concepto','texto')].concat(perCols).concat([col('p','% ventas','porcentaje')]);
+    var mgX=[['Margen bruto','utilidad_bruta',1],['Margen de operación','utilidad_operacion',1],['Margen del ejercicio','utilidad_ejercicio',1],
+      ['Gastos de venta sobre ventas','gastos_venta',-1],['Gastos de administración sobre ventas','gastos_admin',-1]];
+    var mgFilas=mgX.map(function(f){var o={k:f[0]};ps.forEach(function(q,i){var r=erDe(q),x=r?pct(f[2]*r[f[1]],r.ventas):null;o['m'+i]=x==null?null:x/100;});return o;});
     var bgF=[['Efectivo (10)','efectivo'],['Clientes (12)','clientes'],['Inventarios (21 a 28)','inventarios'],['Total activo corriente','activo_corriente'],['Activo fijo bruto (33)','activo_fijo_bruto'],
       ['Depreciación acumulada (39)','dep_acum'],['Activo fijo neto','activo_fijo_neto'],['Total activo (neto de depreciación)','activo_total_neto'],['Proveedores (42)','proveedores'],
       ['Cuentas por pagar diversas (46)','cxp_diversas'],['Total pasivo corriente (sin 39)','pasivo_corriente'],['Total pasivo (sin 39)','pasivo_total'],['Patrimonio','patrimonio'],
@@ -1419,13 +1439,13 @@ window.LS_XLS={
     var anSec=[];
     if(D.anios.length>1){
       var an=D.anios.slice().sort(function(a,b){return a-b;}),aN=an[an.length-1],aP=an[an.length-2];
-      var vv=function(a,k){var r=erDe(a+'-'+String(k+1).padStart(2,'0')+'-01');return r?r[SEL.med]:null;};
+      var enPm=esPctMed(SEL.med),vv=function(a,k){var x=medVal(erDe(a+'-'+String(k+1).padStart(2,'0')+'-01'),SEL.med);return (enPm&&x!=null)?x/100:x;};
       var anF=MES3.map(function(m,k){var o={k:m};an.forEach(function(a){o['a'+a]=vv(a,k);});
         o.d=(o['a'+aN]!=null&&o['a'+aP]!=null)?o['a'+aN]-o['a'+aP]:null;
-        o.v=(o['a'+aN]!=null&&o['a'+aP]!=null&&o['a'+aP]>0)?(o['a'+aN]-o['a'+aP])/o['a'+aP]:null;return o;})
+        o.v=(!enPm&&o['a'+aN]!=null&&o['a'+aP]!=null&&o['a'+aP]>0)?(o['a'+aN]-o['a'+aP])/o['a'+aP]:null;return o;})
         .filter(function(o){return an.some(function(a){return o['a'+a]!=null;});});
-      anSec=[{titulo:MEDIDAS[SEL.med]+(acum?' acumulada de enero a cada mes':' por mes')+', comparativo entre años',nota:'En soles. La diferencia y la variación comparan '+aN+' contra '+aP+' en el mismo mes; sin % si '+aP+' fue pérdida o cero.',
-        columnas:[col('k','Mes','texto')].concat(an.map(function(a){return col('a'+a,String(a),'moneda');})).concat([col('d','Dif. '+aN+' vs '+aP,'moneda'),col('v','Var. %','porcentaje')]),filas:anF}];}
+      anSec=[{titulo:MEDIDAS[SEL.med]+(acum?' acumulada de enero a cada mes':' por mes')+', comparativo entre años',nota:enPm?'En % sobre las ventas de cada período. La diferencia está en puntos porcentuales y compara '+aN+' contra '+aP+' en el mismo mes.':'En soles. La diferencia y la variación comparan '+aN+' contra '+aP+' en el mismo mes; sin % si '+aP+' fue pérdida o cero.',
+        columnas:[col('k','Mes','texto')].concat(an.map(function(a){return col('a'+a,String(a),enPm?'porcentaje':'moneda');})).concat(enPm?[col('d','Dif. '+aN+' vs '+aP+' (pts)','porcentaje')]:[col('d','Dif. '+aN+' vs '+aP,'moneda'),col('v','Var. %','porcentaje')]),filas:anF}];}
     var cmpX=!!SEL.cmp&&D.anios.length>1;
     var out={titulo:'Estados Financieros',sub:cmpX?'comparativo entre años':nomPer(p)+' · '+(acum?'acumulado del año':'mes'),
       formula:'Hoja Resumen: lo que se ve en pantalla. Hoja Detalle: cada cuenta tal como la entrega el sistema, todos los meses cargados.',origen:'Estados Financieros',
@@ -1433,6 +1453,8 @@ window.LS_XLS={
         {titulo:'Estado de resultados ('+(acum?'acumulado de enero a cada mes':'cada mes')+(enPct?', en % de ventas':'')+')',
          nota:enPct?'En % sobre las ventas '+(acum?'acumuladas de enero a cada mes':'de cada mes')+'. Antes de impuestos.':'En soles. % sobre las ventas '+(acum?'acumuladas a ':'de ')+nomPer(p).toLowerCase()+'. Antes de impuestos.',
          columnas:erCols,filas:erFilas},
+        {titulo:'Márgenes ('+(acum?'acumulado de enero a cada mes':'cada mes')+')',nota:'En % sobre las ventas netas de cada columna (utilidad ÷ ventas). Los gastos se muestran en positivo. Antes de impuestos.',
+         columnas:[col('k','Concepto','texto')].concat(ps.map(function(q,i){return col('m'+i,corto(q),'porcentaje');})),filas:mgFilas},
         {titulo:'Balance general (saldo al cierre)',nota:'En soles. La depreciación acumulada (39) resta al activo fijo.',columnas:[col('k','Concepto','texto')].concat(perCols),filas:bgFilas}
       ].concat(anSec).concat([
         {titulo:'Liquidez, endeudamiento y ciclo de caja',nota:'Días aproximados con el promedio mensual de ventas y costo de ventas de enero a cada mes.',
